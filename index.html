@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sorting Algorithm Visualizer</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles for animations and specific elements not easily covered by Tailwind */
+        :root {
+            --primary-bg: #fdf6f6; /* Very light pink/off-white */
+            --secondary-bg: #fbe9e9; /* Slightly darker light pink */
+            --accent-bg: #fce4ec; /* More saturated pastel pink */
+            --text-primary: #4a4a4a; /* Dark grey for contrast */
+            --text-secondary: #888888; /* Lighter grey */
+            --accent-blue: #a7d9f7; /* Soft blue for default bars */
+            --accent-yellow: #fff9c4; /* Pale yellow for comparing */
+            --accent-red: #ffcdd2; /* Very light red/pink for swapping */
+            --accent-green: #c8e6c9; /* Pale green for sorted */
+            --accent-purple: #e1bee7; /* Light purple for active pivot */
+            --accent-orange: #ffe0b2; /* Pale orange for radix pass */
+            --accent-teal: #b2ebf2; /* Light teal for bucket elements */
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--primary-bg); /* Use new primary background */
+            color: var(--text-primary); /* Use new primary text color */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .container {
+            background-color: var(--secondary-bg); /* Use new secondary background */
+            border-radius: 1rem;
+            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1); /* Lighter shadow */
+            padding: 2.5rem;
+            width: 100%;
+            max-width: 1000px;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .bar-container {
+            display: flex;
+            align-items: flex-end; /* Bars grow upwards from the bottom */
+            height: 300px; /* Fixed height for visualization area */
+            background-color: var(--accent-bg); /* Background for bars area */
+            border-radius: 0.5rem;
+            padding: 0.5rem;
+            gap: 2px; /* Small gap between bars */
+            overflow-x: auto; /* Allow horizontal scrolling if many bars */
+            min-width: 300px; /* Ensure it doesn't collapse */
+        }
+
+        .bar {
+            flex-grow: 1; /* Bars take equal width */
+            background-color: var(--accent-blue); /* Default bar color */
+            border-radius: 0.25rem;
+            transition: height 0.2s ease, background-color 0.2s ease, transform 0.2s ease; /* Smooth transitions */
+            min-width: 5px; /* Minimum width for very small arrays */
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            color: var(--text-primary); /* Bar text color */
+            font-weight: bold;
+            font-size: 0.8rem;
+            padding-bottom: 5px;
+            box-shadow: 0 0 0 rgba(0,0,0,0); /* Initial shadow for pulse */
+        }
+
+        /* Bar states */
+        .bar.comparing {
+            background-color: var(--accent-yellow);
+            animation: pulse-compare 0.3s infinite alternate; /* Add pulse animation */
+        }
+        .bar.swapping {
+            background-color: var(--accent-red);
+            animation: bounce-swap 0.3s ease-in-out; /* Add bounce animation */
+        }
+        .bar.sorted {
+            background-color: var(--accent-green);
+        }
+        .bar.active-pivot {
+            background-color: var(--accent-purple);
+        }
+        .bar.current-digit-process {
+            background-color: var(--accent-orange);
+        }
+        .bar.current-bucket-element {
+            background-color: var(--accent-teal);
+        }
+
+
+        .controls button, .controls input[type="range"] {
+            transition: all 0.2s ease;
+        }
+
+        .controls button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Control element styling to match theme */
+        .flex-col > .flex-col > select,
+        .flex-col > .flex-col > input[type="text"] {
+            background-color: var(--secondary-bg);
+            border-color: var(--text-secondary);
+            color: var(--text-primary);
+        }
+
+        #randomize-btn { background-color: #f06292; } /* Pinkish-red */
+        #randomize-btn:hover { background-color: #e91e63; }
+
+        #start-sort-btn { background-color: #ba68c8; } /* Light purple */
+        #start-sort-btn:hover { background-color: #9c27b0; }
+
+        #prev-btn { background-color: #90a4ae; } /* Grey-blue */
+        #prev-btn:hover { background-color: #78909c; }
+
+        #play-pause-btn { background-color: #81c784; } /* Light green */
+        #play-pause-btn:hover { background-color: #4caf50; }
+
+        #next-btn { background-color: #64b5f6; } /* Light blue */
+        #next-btn:hover { background-color: #2196f3; }
+
+
+        /* Message box styling */
+        .message-box {
+            padding: 0.75rem 1.25rem;
+            border-radius: 0.5rem;
+            margin-top: 1rem;
+            font-weight: bold;
+            text-align: center;
+            opacity: 0; /* Hidden by default */
+            transition: opacity 0.3s ease-in-out;
+        }
+
+        .message-box.show {
+            opacity: 1;
+        }
+
+        .message-box.success {
+            background-color: var(--accent-green); /* Green */
+            color: var(--text-primary);
+        }
+
+        .message-box.error {
+            background-color: var(--accent-red); /* Red */
+            color: var(--text-primary);
+        }
+
+        .message-box.info {
+            background-color: var(--accent-blue); /* Blue */
+            color: var(--text-primary);
+        }
+
+        /* Animations Keyframes */
+        @keyframes pulse-compare {
+            0% { box-shadow: 0 0 0 0 rgba(255, 255, 0, 0.7); }
+            100% { box-shadow: 0 0 10px 5px rgba(255, 255, 0, 0); }
+        }
+
+        @keyframes bounce-swap {
+            0%, 100% { transform: translateY(0) scale(1); }
+            50% { transform: translateY(-10px) scale(1.05); }
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 flex items-center justify-center min-h-screen p-5">
+    <div class="container mx-auto p-8 bg-gray-800 rounded-2xl shadow-lg flex flex-col gap-6">
+        <h1 class="text-4xl font-extrabold text-center text-blue-400 mb-4">Sorting Algorithm Visualizer</h1>
+
+        <!-- Controls Section -->
+        <div class="flex flex-col md:flex-row items-center justify-center gap-4 bg-gray-700 p-6 rounded-xl shadow-md">
+            <div class="flex flex-col gap-2 w-full md:w-auto">
+                <label for="algorithm-select" class="text-lg font-semibold">Select Algorithm:</label>
+                <select id="algorithm-select" class="p-3 rounded-lg bg-gray-600 border border-gray-500 text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="bubble_sort">Bubble Sort</option>
+                    <option value="insertion_sort">Insertion Sort</option>
+                    <option value="merge_sort">Merge Sort</option>
+                    <option value="quick_sort">Quick Sort</option>
+                    <option value="selection_sort">Selection Sort</option> <!-- Added Selection Sort -->
+                    <option value="radix_sort">Radix Sort</option> <!-- Added Radix Sort -->
+                </select>
+            </div>
+
+            <div class="flex flex-col gap-2 w-full md:w-auto">
+                <label for="data-input" class="text-lg font-semibold">Input Data (comma-separated):</label>
+                <input type="text" id="data-input" value="15, 8, 22, 1, 30, 10, 5, 25"
+                       class="p-3 rounded-lg bg-gray-600 border border-gray-500 text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                       placeholder="e.g., 5, 2, 8, 1, 9">
+            </div>
+
+            <div class="flex flex-col md:flex-row gap-3 mt-4 md:mt-0">
+                <button id="randomize-btn" class="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg shadow-md focus:outline-none focus:ring-2 focus:ring-indigo-500 transition duration-200">
+                    Randomize Data
+                </button>
+                <button id="start-sort-btn" class="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200">
+                    Start Sort
+                </button>
+            </div>
+        </div>
+
+        <!-- Visualization Area -->
+        <div id="visualization-container" class="bar-container">
+            <!-- Bars will be rendered here by JavaScript -->
+        </div>
+
+        <!-- Status Message Box -->
+        <div id="status-message" class="message-box"></div>
+
+        <!-- Playback Controls -->
+        <div class="flex flex-col sm:flex-row items-center justify-center gap-4 bg-gray-700 p-6 rounded-xl shadow-md">
+            <button id="prev-btn" class="px-5 py-2 bg-gray-500 hover:bg-gray-600 text-white font-bold rounded-lg shadow-md focus:outline-none focus:ring-2 focus:ring-gray-400 transition duration-200" disabled>Previous</button>
+            <button id="play-pause-btn" class="px-5 py-2 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg shadow-md focus:outline-none focus:ring-2 focus:ring-green-500 transition duration-200" disabled>Play</button>
+            <button id="next-btn" class="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg shadow-md focus:outline-none focus:ring-2 focus:ring-purple-500 transition duration-200" disabled>Next</button>
+
+            <div class="flex items-center gap-2 mt-4 sm:mt-0">
+                <label for="speed-slider" class="text-lg font-semibold whitespace-nowrap">Speed:</label>
+                <input type="range" id="speed-slider" min="50" max="2000" value="500"
+                       class="w-32 md:w-48 h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer range-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <span id="speed-value" class="text-sm">500ms</span>
+            </div>
+        </div>
+
+        <!-- Educational Feedback / Legend -->
+        <div class="bg-gray-700 p-6 rounded-xl shadow-md">
+            <h2 class="text-xl font-bold mb-3 text-blue-300">Current Step: <span id="current-step-message" class="font-normal text-gray-200">Ready to start!</span></h2>
+            <h2 class="text-xl font-bold mb-3 text-blue-300">Legend:</h2>
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
+                <div class="flex items-center gap-2"><span class="w-4 h-4 rounded-full bg-blue-400"></span> Default</div>
+                <div class="flex items-center gap-2"><span class="w-4 h-4 rounded-full bg-yellow-400"></span> Comparing</div>
+                <div class="flex items-center gap-2"><span class="w-4 h-4 rounded-full bg-red-400"></span> Swapping</div>
+                <div class="flex items-center gap-2"><span class="w-4 h-4 rounded-full bg-green-400"></span> Sorted</div>
+                <div class="flex items-center gap-2"><span class="w-4 h-4 rounded-full bg-purple-400"></span> Active Pivot</div>
+                <div class="flex items-center gap-2"><span class="w-4 h-4 rounded-full bg-orange-500"></span> Radix Pass</div> <!-- New Radix Legend -->
+                <div class="flex items-center gap-2"><span class="w-4 h-4 rounded-full bg-teal-500"></span> Bucket Element</div> <!-- New Radix Legend -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Frontend JavaScript Logic
+        const API_BASE_URL = 'http://127.0.0.1:5000'; // Ensure this matches your Flask server port
+
+        // DOM Element References
+        const algorithmSelect = document.getElementById('algorithm-select');
+        const dataInput = document.getElementById('data-input');
+        const randomizeBtn = document.getElementById('randomize-btn');
+        const startSortBtn = document.getElementById('start-sort-btn');
+        const visualizationContainer = document.getElementById('visualization-container');
+        const prevBtn = document.getElementById('prev-btn');
+        const playPauseBtn = document.getElementById('play-pause-btn');
+        const nextBtn = document.getElementById('next-btn');
+        const speedSlider = document.getElementById('speed-slider');
+        const speedValueSpan = document.getElementById('speed-value');
+        const statusMessageDiv = document.getElementById('status-message');
+        const currentStepMessageSpan = document.getElementById('current-step-message');
+
+        let currentSessionId = null;
+        let animationSpeed = parseInt(speedSlider.value); // Initial speed from slider
+        let isPlaying = false;
+        let animationInterval = null;
+        let dataArray = []; // The array currently being visualized
+
+        // --- Helper Functions ---
+
+        /**
+         * Displays a status message to the user.
+         * @param {string} message - The message to display.
+         * @param {string} type - 'success', 'error', or 'info' for styling.
+         */
+        function showStatusMessage(message, type) {
+            statusMessageDiv.textContent = message;
+            statusMessageDiv.className = `message-box show ${type}`; // Apply classes
+            // Hide after a few seconds
+            setTimeout(() => {
+                statusMessageDiv.classList.remove('show');
+            }, 3000);
+        }
+
+        /**
+         * Renders the array as bars in the visualization container.
+         * Applies appropriate CSS classes for highlighting.
+         * @param {Array<number>} arr - The array to visualize.
+         * @param {Array<number>} comparisons - Indices of elements being compared.
+         * @param {Array<number>} swaps - Indices of elements being swapped.
+         * @param {Array<number>} sortedIndices - Indices of elements that are sorted.
+         * @param {number|null} activePivot - Index of the active pivot for Quick Sort.
+         * @param {number|null} currentDigitPass - The current digit place for Radix Sort.
+         * @param {Array<Array<number>>} currentBucketElements - Elements currently in a bucket for Radix Sort.
+         */
+        function renderBars(arr, comparisons = [], swaps = [], sortedIndices = [], activePivot = null, currentDigitPass = null, currentBucketElements = []) {
+            visualizationContainer.innerHTML = ''; // Clear previous bars
+            if (arr.length === 0) {
+                visualizationContainer.textContent = "Enter data to visualize.";
+                return;
+            }
+
+            // Calculate max value for scaling bar heights
+            const maxValue = Math.max(...arr);
+            const containerHeight = visualizationContainer.clientHeight - 10; // Account for padding
+
+            arr.forEach((value, index) => {
+                const bar = document.createElement('div');
+                bar.classList.add('bar');
+                bar.style.height = `${(value / maxValue) * containerHeight}px`; // Scale height
+                bar.textContent = value; // Display value on the bar
+
+                // Apply highlighting classes
+                if (sortedIndices.includes(index)) {
+                    bar.classList.add('sorted');
+                } else if (activePivot === index) {
+                    bar.classList.add('active-pivot');
+                } else if (comparisons.includes(index)) {
+                    bar.classList.add('comparing');
+                } else if (swaps.includes(index)) {
+                    bar.classList.add('swapping');
+                } else if (currentDigitPass !== null) {
+                    // For Radix Sort, highlight elements being processed for the current digit pass
+                    bar.classList.add('current-digit-process');
+                }
+                // Check if this element is currently being placed in a bucket (Radix Sort specific)
+                const isBucketElement = currentBucketElements.some(item => item[1] === index);
+                if (isBucketElement) {
+                    bar.classList.add('current-bucket-element');
+                }
+
+
+                visualizationContainer.appendChild(bar);
+            });
+        }
+
+        /**
+         * Updates the UI based on the received state from the backend.
+         * @param {Object} state - The state object from the backend.
+         */
+        function updateUI(state) {
+            dataArray = state.array; // Update the local data array
+            renderBars(state.array, state.comparisons, state.swaps, state.sorted_indices, state.active_pivot, state.current_digit_pass, state.current_bucket_elements);
+            currentStepMessageSpan.textContent = state.message;
+
+            // Enable/disable navigation buttons
+            // prevBtn.disabled = (state.current_step_index <= 0); // This logic needs to be handled by backend response
+            // nextBtn.disabled = state.is_finished; // This logic needs to be handled by backend response
+            // For now, we rely on the backend to tell us if it's finished.
+            if (state.is_finished) {
+                playPauseBtn.textContent = 'Play';
+                playPauseBtn.disabled = true;
+                nextBtn.disabled = true;
+                isPlaying = false;
+                clearInterval(animationInterval);
+                showStatusMessage("Sorting finished!", "success");
+            } else {
+                playPauseBtn.disabled = false;
+                nextBtn.disabled = false;
+            }
+        }
+
+        /**
+         * Fetches the next step from the backend.
+         */
+        async function fetchNextStep() {
+            if (!currentSessionId) return;
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/next_step/${currentSessionId}`);
+                const data = await response.json();
+
+                if (response.ok) {
+                    updateUI(data.state);
+                    if (data.state.is_finished) {
+                        // If finished, stop auto-play
+                        clearInterval(animationInterval);
+                        isPlaying = false;
+                        playPauseBtn.textContent = 'Play';
+                        playPauseBtn.disabled = true;
+                        nextBtn.disabled = true;
+                        prevBtn.disabled = false; // Allow going back to review
+                    }
+                } else {
+                    showStatusMessage(data.error || "Failed to get next step.", "error");
+                    // If an error occurs (e.g., no more steps), stop auto-play
+                    clearInterval(animationInterval);
+                    isPlaying = false;
+                    playPauseBtn.textContent = 'Play';
+                    playPauseBtn.disabled = true;
+                    nextBtn.disabled = true;
+                }
+            } catch (error) {
+                console.error("Error fetching next step:", error);
+                showStatusMessage("Network error or server unavailable.", "error");
+                clearInterval(animationInterval);
+                isPlaying = false;
+                playPauseBtn.textContent = 'Play';
+                playPauseBtn.disabled = true;
+            }
+        }
+
+        /**
+         * Fetches the previous step from the backend.
+         */
+        async function fetchPrevStep() {
+            if (!currentSessionId) return;
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/prev_step/${currentSessionId}`);
+                const data = await response.json();
+
+                if (response.ok) {
+                    updateUI(data.state);
+                    // Re-enable next button if we moved back from a finished state
+                    nextBtn.disabled = false;
+                    playPauseBtn.disabled = false;
+                    currentStepMessageSpan.textContent = data.state.message; // Ensure message updates
+                } else {
+                    showStatusMessage(data.error || "Failed to get previous step.", "error");
+                }
+            } catch (error) {
+                console.error("Error fetching previous step:", error);
+                showStatusMessage("Network error or server unavailable.", "error");
+            }
+        }
+
+        /**
+         * Starts a new sorting visualization session.
+         */
+        async function startSort() {
+            const algorithm = algorithmSelect.value;
+            const data = dataInput.value;
+
+            // Reset any ongoing animation
+            clearInterval(animationInterval);
+            isPlaying = false;
+            playPauseBtn.textContent = 'Play';
+            prevBtn.disabled = true;
+            nextBtn.disabled = true;
+            playPauseBtn.disabled = true;
+            currentStepMessageSpan.textContent = "Starting sort...";
+
+            // If an old session exists, reset it on the backend
+            if (currentSessionId) {
+                await fetch(`${API_BASE_URL}/reset_session/${currentSessionId}`, { method: 'POST' });
+            }
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/start_sort`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ algorithm: algorithm, data: data })
+                });
+                const result = await response.json();
+
+                if (response.ok) {
+                    currentSessionId = result.session_id;
+                    updateUI(result.state);
+                    showStatusMessage("Sorting started! Use controls to navigate.", "info");
+                    // Enable relevant buttons after successful start
+                    prevBtn.disabled = true; // Start at first step, no previous
+                    nextBtn.disabled = result.state.is_finished;
+                    playPauseBtn.disabled = result.state.is_finished;
+                } else {
+                    showStatusMessage(result.error || "Failed to start sort.", "error");
+                    currentSessionId = null; // Clear session ID on error
+                    renderBars([]); // Clear visualization
+                    currentStepMessageSpan.textContent = "Error or no data to sort.";
+                }
+            } catch (error) {
+                console.error("Error starting sort:", error);
+                showStatusMessage("Network error or server unavailable. Make sure Flask server is running.", "error");
+                currentSessionId = null;
+                renderBars([]);
+                currentStepMessageSpan.textContent = "Failed to connect to backend.";
+            }
+        }
+
+        /**
+         * Toggles play/pause for the animation.
+         */
+        function togglePlayPause() {
+            if (isPlaying) {
+                clearInterval(animationInterval);
+                playPauseBtn.textContent = 'Play';
+                isPlaying = false;
+            } else {
+                // Ensure we can play only if a session is active and not finished
+                if (currentSessionId && !nextBtn.disabled) {
+                    animationInterval = setInterval(fetchNextStep, animationSpeed);
+                    playPauseBtn.textContent = 'Pause';
+                    isPlaying = true;
+                } else if (nextBtn.disabled && currentSessionId) {
+                    showStatusMessage("Sorting is already finished!", "info");
+                } else {
+                    showStatusMessage("Please start a sort first.", "info");
+                }
+            }
+        }
+
+        /**
+         * Updates the animation speed based on the slider value.
+         */
+        function updateSpeed() {
+            animationSpeed = parseInt(speedSlider.value);
+            speedValueSpan.textContent = `${animationSpeed}ms`;
+            // If playing, restart interval with new speed
+            if (isPlaying) {
+                clearInterval(animationInterval);
+                animationInterval = setInterval(fetchNextStep, animationSpeed);
+            }
+        }
+
+        /**
+         * Generates a random array of numbers for visualization.
+         */
+        function randomizeData() {
+            const numElements = Math.floor(Math.random() * 15) + 5; // 5 to 20 elements
+            const randomArray = Array.from({ length: numElements }, () => Math.floor(Math.random() * 99) + 1); // 1 to 100
+            dataInput.value = randomArray.join(', ');
+            renderBars(randomArray); // Immediately show random bars
+            showStatusMessage("New random data generated!", "info");
+            currentStepMessageSpan.textContent = "Ready to start with new data.";
+            // Reset buttons to initial state
+            prevBtn.disabled = true;
+            nextBtn.disabled = true;
+            playPauseBtn.disabled = true;
+            playPauseBtn.textContent = 'Play';
+            clearInterval(animationInterval);
+            isPlaying = false;
+        }
+
+        // --- Event Listeners ---
+        randomizeBtn.addEventListener('click', randomizeData);
+        startSortBtn.addEventListener('click', startSort);
+        nextBtn.addEventListener('click', fetchNextStep);
+        prevBtn.addEventListener('click', fetchPrevStep);
+        playPauseBtn.addEventListener('click', togglePlayPause);
+        speedSlider.addEventListener('input', updateSpeed);
+
+        // Initial setup on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            randomizeData(); // Generate initial random data
+            renderBars(dataInput.value.split(',').map(Number)); // Render initial bars
+            showStatusMessage("Welcome! Select an algorithm and click Start Sort.", "info");
+        });
+
+    </script>
+</body>
+</html>
