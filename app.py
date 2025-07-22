@@ -11,6 +11,12 @@ import time
 app = Flask(__name__)
 CORS(app) # Enable Cross-Origin Resource Sharing for frontend communication
 
+# --- Add this new route ---
+@app.route('/')
+def home():
+    return "SimplifySort Backend is Running!"
+# --- End of new route ---
+
 # Dictionary to store active sorting sessions.
 # Each session will hold:
 # - 'generator': The generator object for the chosen sorting algorithm.
